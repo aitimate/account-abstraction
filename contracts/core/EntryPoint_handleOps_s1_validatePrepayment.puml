@@ -1,0 +1,30 @@
+@startuml
+participant _validatePrepayment
+participant _validateAndUpdateNonce
+participant _copyUserOpToMemory
+participant _getRequiredPrefund
+participant _validateAccountPrepayment
+participant _validatePaymasterPrepayment
+
+
+_validatePrepayment <-> _copyUserOpToMemory: 1- UserOperation To UserOpInfo
+_validatePrepayment -> _validatePrepayment: 2- UserOpInfo Gas溢出检查
+_validatePrepayment -> _getRequiredPrefund: 3- 计算足额Gas requiredPreFund = (callGasLimit + verificationGasLimit * mul + preVerificationGas) * maxFeePerGas
+_validatePrepayment -> _validateAccountPrepayment: 4- 验证Sender
+
+_validateAccountPrepayment -> _validateAccountPrepayment: 4.1- 尝试创建sender合约钱包 _createSenderIfNeeded
+_validateAccountPrepayment -> _validateAccountPrepayment: 4.2- paymaster == address(0) deposits[sender].deposit 组合预付 requiredPreFund
+_validateAccountPrepayment -> _validateAccountPrepayment: 4.3- 回调 validationData = IAccount(sender).validateUserOp{gas: mUserOp.verificationGasLimit}\n(op, opInfo.userOpHash, missingAccountFunds)
+_validateAccountPrepayment -> _validateAccountPrepayment: 4.4- 统计当前合约执行花销的Gas费 gasUsedByValidateAccountPrepayment
+_validateAccountPrepayment -> _validatePrepayment: 5- 返回 (gasUsedByValidateAccountPrepayment, validationData)
+
+_validatePrepayment -> _validateAndUpdateNonce: 6- 校验sender的nonce是否合法有序
+_validatePrepayment -> _validatePaymasterPrepayment: 7- 若有代付人Paymaster，则由 deposits[paymaster].deposit 预付 requiredPreFund
+
+_validatePaymasterPrepayment -> _validatePaymasterPrepayment: 7.1- 检查gasUsedByValidateAccountPrepayment是否超过userOp.verificationGasLimit
+_validatePaymasterPrepayment -> _validatePaymasterPrepayment: 7.2- deposits[paymaster].deposit 预付 requiredPreFund
+_validatePaymasterPrepayment -> _validatePaymasterPrepayment: 7.3- 回调 (context, validationData) = IPaymaster(paymaster).validatePaymasterUserOp\n{gas: mUserOp.verificationGasLimit - gasUsedByValidateAccountPrepayment}\n(op, opInfo.userOpHash, requiredPreFund)
+
+_validatePrepayment -> _validatePrepayment: 8- 检查执行此函数是否超过userOp.verificationGasLimit
+_validatePrepayment -> _validatePrepayment: 9- outOpInfo.prefund = requiredPreFund; \noutOpInfo.contextOffset = getOffsetOfMemoryBytes(context); \noutOpInfo.preOpGas = preGas - gasleft() + userOp.preVerificationGas;
+@enduml

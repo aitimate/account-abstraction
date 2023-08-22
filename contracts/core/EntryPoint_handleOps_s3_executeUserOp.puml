@@ -1,0 +1,19 @@
+@startuml
+participant _executeUserOp
+participant innerHandleOp
+participant _handlePostOp
+
+_executeUserOp -> innerHandleOp: 1- 调用 innerHandleOp()
+innerHandleOp -> innerHandleOp: 2.1- Gas检查: gasleft() < callGasLimit + verificationGasLimit + 5000
+innerHandleOp -> innerHandleOp: 2.2- 执行操作: Exec.call(mUserOp.sender, 0, callData, callGasLimit);
+innerHandleOp -> innerHandleOp: 2.3- [成功] actualGas = 执行innerHandleOp函数的Gas + opInfo.preOpGas\n (opInfo.preOpGas = _validatePrepayment Gas + preVerificationGas)
+innerHandleOp -x innerHandleOp: 2.3- [失败] actualGas = 执行_executeUserOp函数的Gas + opInfo.preOpGas\n (opInfo.preOpGas = _validatePrepayment Gas + preVerificationGas)
+innerHandleOp -> innerHandleOp: 2.4- collected = _handlePostOp(0, mode, opInfo, context, actualGas)
+
+innerHandleOp --\\ _handlePostOp
+_executeUserOp --\\ _handlePostOp
+_handlePostOp -> _handlePostOp: 3.1: 若偿还人是paymaster && context.length > 0，则IPaymaster(paymaster).postOp\n{gas: mUserOp.verificationGasLimit}(mode, context, actualGasCost)
+_handlePostOp -> _handlePostOp: 3.2: 偿还多余的预付款: _incrementDeposit(refundAddress, opInfo.prefund - actualGasCost)
+
+_executeUserOp <- innerHandleOp: 4- 返回_handlePostOp()奖励
+@enduml

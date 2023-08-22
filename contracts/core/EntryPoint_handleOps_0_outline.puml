@@ -1,0 +1,19 @@
+@startuml
+participant handleOps
+control for
+participant _validatePrepayment
+participant _validateAccountAndPaymasterValidationData
+participant _executeUserOp
+participant _compensate
+
+handleOps ->o for
+for -> _validatePrepayment: 1- sender || paymaster 预付，期间回调 IAccount(sender).validateUserOp \n|| IPaymaster(paymaster).validatePaymasterUserOp
+for -> _validateAccountAndPaymasterValidationData: 2- ValidationData 签名验证
+handleOps ->o for
+for -> _executeUserOp: 3- 执行<操作>并返还多余的预付金，注意: 在_handlePostOp阶段，\n如果paymaster的context回调大于0，则会触发IPaymaster(paymaster).postOp回调
+handleOps -> _compensate: 4- 向打包者转偿还本币
+
+' handleOps 函数依赖于两个基类回调: BaseAccount.sol(例:SimpleAccount.sol) 或 BasePaymaster.sol(例:DepositPaymaster.sol, LegacyTokenPaymaster.sol固定汇率代换支付, TokenPaymaster.sol代币代换支付, )
+' signer 最前端，用户签名
+' sender 最前端，用户签名
+@enduml
